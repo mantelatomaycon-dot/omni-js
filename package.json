@@ -1,0 +1,17 @@
+{
+  "name": "omni-js-cmd",
+  "version": "3.0.0",
+  "description": "OmniJS command-line utilities for Windows CMD and Node.js",
+  "main": "omni.js",
+  "bin": {
+    "omni": "./omni.js"
+  },
+  "files": [
+    "omni.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
