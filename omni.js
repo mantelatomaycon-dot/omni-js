@@ -14,8 +14,9 @@ const OmniJS = {
 
     help() {
         console.log('\n🌟 OmniJS v' + this.version + ' — 2026 CMD Edition\n');
-        console.log('Usage: node omni.js <command> [arguments]\n');
+        console.log('Usage: omni <command> [arguments]\n');
         console.log('  help                         Show this menu');
+        console.log('  version                      Show version information');
         console.log('  calc "<expression>"          Safely calculate arithmetic');
         console.log('  links <URL-or-html-file>     Extract unique links');
         console.log('  images <URL-or-html-file>    Extract image URLs');
@@ -23,12 +24,12 @@ const OmniJS = {
         console.log('  write <file> "<text>"        Create a UTF-8 text file');
         console.log('  exit                         Close interactive mode\n');
         console.log('Examples:');
-        console.log('  node omni.js calc "5 * (2 + 3)"');
-        console.log('  node omni.js links "https://example.com"');
-        console.log('  node omni.js images page.html');
-        console.log('  node omni.js clean page.html');
-        console.log('  node omni.js write note.txt "Hello world"');
-        console.log('  node omni.js                 Start interactive mode\n');
+        console.log('  omni calc "5 * (2 + 3)"');
+        console.log('  omni links "https://example.com"');
+        console.log('  omni images page.html');
+        console.log('  omni clean page.html');
+        console.log('  omni write note.txt "Hello world"');
+        console.log('  omni                          Start interactive mode\n');
         console.log('No third-party packages are required. URL commands need an internet connection.\n');
     },
 
@@ -198,6 +199,11 @@ function tokenize(input) {
 
 async function execute(command, args) {
     switch (command.toLowerCase()) {
+        case 'version':
+        case '--version':
+        case '-v':
+            console.log('OmniJS v' + OmniJS.version + ' — 2026 CMD Edition');
+            break;
         case 'help':
         case '--help':
         case '-h':
@@ -216,13 +222,13 @@ async function execute(command, args) {
             await OmniJS.cleanPage(args.join(' '));
             break;
         case 'write':
-            if (args.length < 2) throw new Error('Usage: node omni.js write <file> "<text>"');
+            if (args.length < 2) throw new Error('Usage: omni write <file> "<text>"');
             OmniJS.writeText(args[0], args.slice(1).join(' '));
             break;
         case 'exit':
             return false;
         default:
-            throw new Error('Unknown command. Run node omni.js help.');
+            throw new Error('Unknown command. Run omni help.');
     }
     return true;
 }
