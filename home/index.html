@@ -119,16 +119,17 @@
           <div class="command"><code>omni</code><span>Open the interactive menu</span><button type="button" data-copy="omni">Copy</button></div>
           <div class="command"><code>omni help</code><span>Show available commands</span><button type="button" data-copy="omni help">Copy</button></div>
           <div class="command"><code>omni version</code><span>Show version information</span><button type="button" data-copy="omni version">Copy</button></div>
-          <div class="command"><code>omni calc "5 * (2 + 3)"</code><span>Calculate an expression</span></div>
-          <div class="command"><code>omni links "https://example.com"</code><span>Find webpage links</span></div>
+          <div class="command"><code>omni calc "5 * (2 + 3)"</code><span>Calculate an expression</span><button type="button" data-copy="omni calc &quot;5 * (2 + 3)&quot;">Copy</button></div>
+          <div class="command"><code>omni links "https://example.com"</code><span>Find webpage links</span><button type="button" data-copy="omni links &quot;https://example.com&quot;">Copy</button></div>
           <div class="command"><code>omni images page.html</code><span>Extract image URLs from a local HTML file</span><button type="button" data-copy="omni images page.html">Copy</button></div>
           <div class="command"><code>omni clean page.html</code><span>Save a cleaned copy of an HTML file</span><button type="button" data-copy="omni clean page.html">Copy</button></div>
-          <div class="command"><code>omni write note.txt "Hello world"</code><span>Create a UTF-8 text file</span></div>
+          <div class="command"><code>omni write note.txt "Hello world"</code><span>Create a UTF-8 text file</span><button type="button" data-copy="omni write note.txt &quot;Hello world&quot;">Copy</button></div>
         </div>
         <h2 style="margin-top:42px">Try it in CMD</h2>
-        <pre><code>npm install -g github:mantelatomaycon-dot/omni-js
-omni version
-omni calc "5 * (2 + 3)"</code></pre>
+        <pre><code>npm install -g github:mantelatomaycon-dot/omni-js &amp;&amp; omni version &amp;&amp; omni help
+omni calc "5 * (2 + 3)"
+omni links "https://example.com"
+omni write page.html "&lt;html&gt;&lt;body&gt;&lt;a href='https://example.com'&gt;Example&lt;/a&gt;&lt;img src='https://example.com/image.png'&gt;&lt;/body&gt;&lt;/html&gt;" &amp;&amp; omni links page.html &amp;&amp; omni images page.html &amp;&amp; omni clean page.html</code></pre>
       </div>
     </section>
   </main>
@@ -145,6 +146,17 @@ omni calc "5 * (2 + 3)"</code></pre>
       } catch {
         copyButton.textContent = 'Select and copy the command';
       }
+    });
+    document.querySelectorAll('[data-copy]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const command = button.getAttribute('data-copy');
+        try {
+          await navigator.clipboard.writeText(command);
+          button.textContent = 'Copied!';
+        } catch {
+          button.textContent = 'Select and copy: ' + command;
+        }
+      });
     });
   </script>
 </body>
