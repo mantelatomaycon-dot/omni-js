@@ -2,61 +2,66 @@
 
 **OmniJS 3.0.0 — 2026 CMD Edition**
 
-A lightweight JavaScript utility toolkit that runs in the Windows Command Prompt (CMD) using Node.js. It also supports direct commands and an interactive terminal menu.
+A lightweight JavaScript command-line toolkit for Windows CMD, PowerShell, and other terminals.
 
 ## Requirements
 
-- Node.js 24 LTS or newer
-- Windows CMD, PowerShell, or another terminal
-- No third-party npm packages
+- Node.js 18 or newer
+- npm (included with Node.js)
 
-Check your Node.js installation:
+Check your installation:
 
-\`\`\`cmd
+```cmd
 node --version
-\`\`\`
+npm --version
+```
 
-## Quick start
+## Install the global `omni` command
 
-Download \`omni.js\` from this repository, open CMD in the folder where you saved it, and run:
+Run this once in CMD:
 
-\`\`\`cmd
-node omni.js
-\`\`\`
+```cmd
+npm install -g github:mantelatomaycon-dot/omni-js
+```
 
-Type \`help\` to see the available commands, or \`exit\` to close OmniJS.
+After installation, open a new CMD window and use `omni` from any directory. No manual `.cmd` file is needed. npm creates the command shim from this package's `bin` configuration.
+
+If Windows says `omni` is not recognized, check that npm's global executable directory is included in your Windows `Path`. You do not need to create a launcher file yourself.
+
+To update to the latest repository version:
+
+```cmd
+npm install -g github:mantelatomaycon-dot/omni-js
+```
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| \`node omni.js help\` | Show help |
-| \`node omni.js calc "5 * (2 + 3)"\` | Calculate arithmetic safely |
-| \`node omni.js links "https://example.com"\` | Extract unique HTTP(S) links from a webpage |
-| \`node omni.js images "https://example.com"\` | Extract image URLs from a webpage |
-| \`node omni.js links page.html\` | Extract links from a local HTML file |
-| \`node omni.js images page.html\` | Extract images from a local HTML file |
-| \`node omni.js clean page.html\` | Save a cleaned copy as \`page.cleaned.html\` |
-| \`node omni.js write note.txt "Hello world"\` | Create a UTF-8 text file |
-
-You can also run these commands from the interactive \`OmniJS>\` prompt without typing \`node omni.js\` each time.
+| `omni` | Open the interactive menu |
+| `omni help` | Show help |
+| `omni version` | Show the version |
+| `omni calc "5 * (2 + 3)"` | Safely calculate arithmetic |
+| `omni links "https://example.com"` | Extract unique HTTP(S) links |
+| `omni images "https://example.com"` | Extract image URLs |
+| `omni links page.html` | Extract links from a local HTML file |
+| `omni images page.html` | Extract images from a local HTML file |
+| `omni clean page.html` | Save a cleaned HTML copy |
+| `omni write note.txt "Hello world"` | Create a UTF-8 text file |
 
 ## Features
 
-- **Interactive CMD menu** with readable errors and command help.
-- **Safe arithmetic parser** for numbers, parentheses, addition, subtraction, multiplication, division, modulo, and exponentiation. It does not use \`eval()\` or \`Function()\`.
-- **Link and image extraction** from local HTML files or HTTP(S) pages, with duplicate removal and relative URL resolution for online pages.
-- **HTML cleanup copy** that looks for common ad, sponsor, cookie-banner, and modal naming patterns without overwriting the original file.
-- **Text file creation** using UTF-8 encoding.
-- **Built-in Node.js APIs only**; no npm install step is needed.
+- Interactive terminal menu.
+- Arithmetic parser that does not use `eval()` or `Function()`.
+- Link and image extraction from local HTML files or HTTP(S) pages.
+- HTML cleanup saves a copy and leaves the original unchanged.
+- UTF-8 text file creation.
+- Built-in Node.js APIs only; no third-party runtime packages.
 
-## Notes and limitations
+## Limitations
 
-- Fetching a website requires an internet connection. Some websites block automated requests or render their content with JavaScript, so not every link or image will be present in the returned HTML.
-- HTML cleanup uses simple pattern matching, not a full HTML parser. Review the generated copy before using it; it may miss some elements or remove an unexpected match.
-- The calculator accepts arithmetic expressions only, not JavaScript code or named functions.
-- Use quotes around URLs, file paths, or text that contains spaces when entering commands in CMD.
+Website requests require an internet connection. Some sites block automated requests or render content with JavaScript. HTML cleanup uses simple pattern matching rather than a full HTML parser, so review the output before using it.
 
 ## License
 
-No license file is currently specified. Add a license before presenting OmniJS as an open-source project for reuse by others.
+No license file is currently specified.
