@@ -2,30 +2,38 @@
 'use strict';
 
 const fs = require('node:fs');
+const path = require('node:path');
 const readline = require('node:readline/promises');
 const { stdin, stdout } = require('node:process');
 
+const MAX_HTML_BYTES = 5 * 1024 * 1024;
+const REQUEST_TIMEOUT_MS = 15000;
+
 const OmniJS = {
-    version: '2.0.0',
+    version: '3.0.0',
 
     help() {
-        console.log('\n🌟 OmniJS v' + this.version + ' — CMD Edition\n');
+        console.log('\n🌟 OmniJS v' + this.version + ' — 2026 CMD Edition\n');
+        console.log('Usage: node omni.js <command> [arguments]\n');
         console.log('  help                         Show this menu');
-        console.log('  calc <expression>            Calculate arithmetic safely');
-        console.log('  links <html-file>            Extract unique links from an HTML file');
-        console.log('  images <html-file>           Extract image URLs from an HTML file');
-        console.log('  clean <html-file>            Save a copy with common ad/overlay elements removed');
-        console.log('  write <file> <text>          Create a text file');
-        console.log('  exit                         Close OmniJS\n');
+        console.log('  calc "<expression>"          Safely calculate arithmetic');
+        console.log('  links <URL-or-html-file>     Extract unique links');
+        console.log('  images <URL-or-html-file>    Extract image URLs');
+        console.log('  clean <URL-or-html-file>     Save a cleaned HTML copy');
+        console.log('  write <file> "<text>"        Create a UTF-8 text file');
+        console.log('  exit                         Close interactive mode\n');
         console.log('Examples:');
         console.log('  node omni.js calc "5 * (2 + 3)"');
-        console.log('  node omni.js links page.html');
+        console.log('  node omni.js links "https://example.com"');
+        console.log('  node omni.js images page.html');
+        console.log('  node omni.js clean page.html');
         console.log('  node omni.js write note.txt "Hello world"');
-        console.log('  node omni.js                 Open interactive mode\n');
+        console.log('  node omni.js                 Start interactive mode\n');
+        console.log('No third-party packages are required. URL commands need an internet connection.\n');
     },
 
     calculate(expression) {
-        const source = String(expression || '');
+        const source = String(expression ?? '');
         const tokenPattern = /\s*(?:(\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?|(\*\*|[()+\-*/%]))/iy;
         const tokens = [];
         let position = 0;
@@ -35,7 +43,7 @@ const OmniJS = {
             const match = tokenPattern.exec(source);
             if (!match) {
                 if (/^\s*$/.test(source.slice(position))) break;
-                throw new Error('Only numbers and arithmetic operators (+ - * / % **) are allowed.');
+                throw new Error('Only numbers, parentheses, and + - * / % ** operators are allowed.');
             }
             tokens.push(match[1] !== undefined ? Number(match[0].trim()) : match[2]);
             position = tokenPattern.lastIndex;
@@ -103,84 +111,134 @@ const OmniJS = {
         return result;
     },
 
-    readHtml(filePath) {
-        if (!filePath) throw new Error('Please provide an HTML file path.');
-        return fs.readFileSync(filePath, 'utf8');
+    async getHtml(source) {
+        if (!source) throw new Error('Provide a URL or local HTML file.');
+        if (/^https?:\/\//i.test(source)) {
+            const response = await fetch(source, {
+                headers: { 'user-agent': 'OmniJS/3.0.0 (HTML utility)' },
+                signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+            });
+            if (!response.ok) throw new Error('Request failed: HTTP ' + response.status + ' ' + response.statusText);
+            const html = await response.text();
+            if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
+                throw new Error('The page is larger than the 5 MB limit.');
+            }
+            return { html, baseUrl: response.url || source };
+        }
+        if (/^[a-z][a-z\d+.-]*:\/\//i.test(source)) {
+            throw new Error('Only http:// and https:// URLs are supported.');
+        }
+        const html = fs.readFileSync(source, 'utf8');
+        if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
+            throw new Error('The HTML file is larger than the 5 MB limit.');
+        }
+        return { html, baseUrl: null };
     },
 
-    listLinks(filePath) {
-        const html = this.readHtml(filePath);
-        const links = [...new Set(Array.from(
-            html.matchAll(/\bhref\s*=\s*["']([^"']+)["']/gi),
-            match => match[1]
-        ).filter(value => /^https?:\/\//i.test(value)))];
+    resolveUrl(value, baseUrl) {
+        try {
+            const result = baseUrl ? new URL(value, baseUrl) : new URL(value);
+            return ['http:', 'https:'].includes(result.protocol) ? result.href : null;
+        } catch {
+            return null;
+        }
+    },
 
-        if (!links.length) console.log('No absolute HTTP(S) links found.');
-        else links.forEach((link, index) => console.log((index + 1) + '. ' + link));
+    async listLinks(source) {
+        const { html, baseUrl } = await this.getHtml(source);
+        const found = Array.from(html.matchAll(/\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>\x60]+))/gi),
+            match => match[1] ?? match[2] ?? match[3]);
+        const links = [...new Set(found.map(value => this.resolveUrl(value, baseUrl)).filter(Boolean))];
+        if (!links.length) console.log('No HTTP(S) links found.');
+        else links.forEach((url, index) => console.log(String(index + 1).padStart(3, ' ') + '. ' + url));
         console.log('\nFound ' + links.length + ' unique link(s).');
         return links;
     },
 
-    listImages(filePath) {
-        const html = this.readHtml(filePath);
-        const images = [...new Set(Array.from(
-            html.matchAll(/<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi),
-            match => match[1]
-        ))];
-
-        if (!images.length) console.log('No image sources found.');
-        else images.forEach((src, index) => console.log((index + 1) + '. ' + src));
+    async listImages(source) {
+        const { html, baseUrl } = await this.getHtml(source);
+        const found = Array.from(html.matchAll(/<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>\x60]+))/gi),
+            match => match[1] ?? match[2] ?? match[3]);
+        const images = [...new Set(found.map(value => this.resolveUrl(value, baseUrl)).filter(Boolean))];
+        if (!images.length) console.log('No image URLs found.');
+        else images.forEach((url, index) => console.log(String(index + 1).padStart(3, ' ') + '. ' + url));
         console.log('\nFound ' + images.length + ' unique image(s).');
         return images;
     },
 
-    cleanPage(filePath) {
-        const html = this.readHtml(filePath);
-        const outputPath = filePath.replace(/\.html?$/i, '') + '.cleaned.html';
-        const patterns = [
-            /<([a-z][\w:-]*)\b[^>]*(?:id|class)\s*=\s*["'][^"']*(?:advert|sponsor|cookie-banner|cookie-consent|popup|pop-up)[^"']*["'][^>]*>[\s\S]*?<\/\1\s*>/gi
-        ];
-        let cleaned = html;
-        for (const pattern of patterns) cleaned = cleaned.replace(pattern, '');
+    async cleanPage(source) {
+        const { html, baseUrl } = await this.getHtml(source);
+        const pattern = /<([a-z][\w:-]*)\b(?=[^>]*(?:id|class)\s*=\s*["'][^"']*(?:advert|sponsor|cookie[-_ ]?(?:banner|consent|notice)|popup|pop-up|modal|ad-container)[^"']*["'])[^>]*>[\s\S]*?<\/\1\s*>/gi;
+        const cleaned = html.replace(pattern, '');
+        const outputPath = baseUrl
+            ? path.resolve('omni-cleaned-' + new URL(baseUrl).hostname.replace(/[^a-z0-9.-]/gi, '_') + '.html')
+            : path.resolve(source.replace(/\.html?$/i, '') + '.cleaned.html');
         fs.writeFileSync(outputPath, cleaned, 'utf8');
         console.log('Saved cleaned copy to: ' + outputPath);
-        console.log('The original file was not changed.');
+        console.log('The original source was not changed. Review the output before using it.');
         return outputPath;
     },
 
-    downloadText(fileName, content) {
-        if (!fileName) throw new Error('Please provide a file name.');
+    writeText(fileName, content) {
+        if (!fileName) throw new Error('Provide a file name.');
         fs.writeFileSync(fileName, String(content ?? ''), 'utf8');
-        console.log('Saved text file: ' + fileName);
+        console.log('Saved UTF-8 text file: ' + path.resolve(fileName));
     }
 };
 
+function tokenize(input) {
+    const tokens = [];
+    const pattern = /"([^"]*)"|'([^']*)'|(\S+)/g;
+    let match;
+    while ((match = pattern.exec(input)) !== null) {
+        tokens.push(match[1] ?? match[2] ?? match[3]);
+    }
+    return tokens;
+}
+
+async function execute(command, args) {
+    switch (command.toLowerCase()) {
+        case 'help':
+        case '--help':
+        case '-h':
+            OmniJS.help();
+            break;
+        case 'calc':
+            console.log('Result: ' + OmniJS.calculate(args.join(' ')));
+            break;
+        case 'links':
+            await OmniJS.listLinks(args.join(' '));
+            break;
+        case 'images':
+            await OmniJS.listImages(args.join(' '));
+            break;
+        case 'clean':
+            await OmniJS.cleanPage(args.join(' '));
+            break;
+        case 'write':
+            if (args.length < 2) throw new Error('Usage: node omni.js write <file> "<text>"');
+            OmniJS.writeText(args[0], args.slice(1).join(' '));
+            break;
+        case 'exit':
+            return false;
+        default:
+            throw new Error('Unknown command. Run node omni.js help.');
+    }
+    return true;
+}
+
 async function interactiveMode() {
     const rl = readline.createInterface({ input: stdin, output: stdout });
-    console.log('\n🌟 Welcome to OmniJS v' + OmniJS.version + ' — CMD Edition');
+    console.log('\n🌟 Welcome to OmniJS v' + OmniJS.version + ' — 2026 CMD Edition');
     console.log('Type help to see commands, or exit to quit.\n');
 
     try {
         while (true) {
             const input = (await rl.question('OmniJS> ')).trim();
             if (!input) continue;
-            if (/^exit$/i.test(input)) break;
-            if (/^help$/i.test(input)) { OmniJS.help(); continue; }
-
-            const firstSpace = input.indexOf(' ');
-            const command = (firstSpace < 0 ? input : input.slice(0, firstSpace)).toLowerCase();
-            const args = firstSpace < 0 ? '' : input.slice(firstSpace + 1).trim();
-
+            const [command, ...args] = tokenize(input);
             try {
-                if (command === 'calc') console.log('Result: ' + OmniJS.calculate(args));
-                else if (command === 'links') OmniJS.listLinks(args.replace(/^["']|["']$/g, ''));
-                else if (command === 'images') OmniJS.listImages(args.replace(/^["']|["']$/g, ''));
-                else if (command === 'clean') OmniJS.cleanPage(args.replace(/^["']|["']$/g, ''));
-                else if (command === 'write') {
-                    const match = args.match(/^(\S+)\s+([\s\S]*)$/);
-                    if (!match) throw new Error('Usage: write <file> <text>');
-                    OmniJS.downloadText(match[1], match[2].replace(/^["']|["']$/g, ''));
-                } else console.log('Unknown command. Type help for commands.');
+                if (!await execute(command, args)) break;
             } catch (error) {
                 console.error('Error: ' + error.message);
             }
@@ -191,33 +249,17 @@ async function interactiveMode() {
     console.log('OmniJS closed.');
 }
 
-function runCommand(args) {
-    const command = (args[0] || 'help').toLowerCase();
-    const rest = args.slice(1);
-
+async function main() {
+    const args = process.argv.slice(2);
+    if (!args.length) return interactiveMode();
+    const [command, ...rest] = args;
     try {
-        if (command === 'help' || command === '--help' || command === '-h') OmniJS.help();
-        else if (command === 'calc') console.log(OmniJS.calculate(rest.join(' ')));
-        else if (command === 'links') OmniJS.listLinks(rest.join(' '));
-        else if (command === 'images') OmniJS.listImages(rest.join(' '));
-        else if (command === 'clean') OmniJS.cleanPage(rest.join(' '));
-        else if (command === 'write') {
-            if (rest.length < 2) throw new Error('Usage: node omni.js write <file> <text>');
-            OmniJS.downloadText(rest[0], rest.slice(1).join(' '));
-        } else if (command === 'exit') process.exit(0);
-        else throw new Error('Unknown command. Run node omni.js help to see commands.');
+        await execute(command, rest);
     } catch (error) {
         console.error('Error: ' + error.message);
         process.exitCode = 1;
     }
 }
 
-if (require.main === module) {
-    if (process.argv.length <= 2) interactiveMode().catch(error => {
-        console.error(error.message);
-        process.exitCode = 1;
-    });
-    else runCommand(process.argv.slice(2));
-}
-
+if (require.main === module) main();
 module.exports = OmniJS;
